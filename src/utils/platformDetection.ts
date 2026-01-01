@@ -42,6 +42,21 @@ export const isAndroid = (): boolean => {
 };
 
 /**
+ * Check if running on Android Chrome
+ */
+export const isAndroidChrome = (): boolean => {
+  if (!isWeb() || typeof window === 'undefined') {
+    return false;
+  }
+
+  const userAgent = navigator.userAgent.toLowerCase();
+  const isAndroid = userAgent.includes('android');
+  const isChrome = userAgent.includes('chrome') && !userAgent.includes('edg');
+
+  return isAndroid && isChrome;
+};
+
+/**
  * Get platform-specific value
  */
 export const platformSelect = <T>(values: {

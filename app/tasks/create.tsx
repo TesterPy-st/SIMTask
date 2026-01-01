@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,21 +7,23 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
-  Platform,
-  Modal,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Haptics from 'expo-haptics';
 import { createTask, getSettings } from '../../src/services/storage';
 import { scheduleTaskReminders } from '../../src/services/platformNotifications';
 import { parseVoiceInput } from '../../src/utils/voiceParser';
 import { validateTask, sanitizeText } from '../../src/utils/validation';
+import { isWeb } from '../../src/utils/platformDetection';
+import { startSpeechRecognition, stopSpeechRecognition, getAvailabilityMessage } from '../../src/services/speechToText';
 import { Button } from '../../src/components/Button';
 import { Footer } from '../../src/components/Footer';
+import { DateTimePickerComponent } from '../../src/components/DateTimePicker';
 import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS } from '../../src/constants/theme';
 import { formatDateForStorage, formatDate, formatTime } from '../../src/utils/dateUtils';
+import { Task } from '../../src/types';
 
 export default function CreateTaskScreen() {
   const router = useRouter();
@@ -33,60 +35,64 @@ export default function CreateTaskScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [voiceModalVisible, setVoiceModalVisible] = useState(false);
   const [isListening, setIsListening] = useState(false);
-  const [voiceTranscript, setVoiceTranscript] = useState('');
 
-  const handleVoiceInput = () => {
-    setVoiceModalVisible(true);
+  const handleVoiceInput = async () => {
+    if (isListening) {
+      stopSpeechRecognition();
+      setIsListening(false);
+      return;
+    }
+
+    const availabilityMessage = getAvailabilityMessage();
+    
+    if (availabilityMessage) {
+      Alert.alert(
+        'Voice Input Not Available',
+        availabilityMessage,
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
     Alert.alert(
       'Voice Input',
       'Please say your task in the following format:\n\n"Set task on [date] as [task name]"\n\nExample: "Set task on 11 January 2026 as Hackathon at 3 PM"',
       [
-        { text: 'Cancel', style: 'cancel', onPress: () => setVoiceModalVisible(false) },
-        { text: 'Start Recording', onPress: startVoiceRecognition },
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Start Recording', 
+          onPress: () => {
+            setIsListening(true);
+            Alert.alert('Listening...', 'Speak your task now.', [{ text: 'Stop', onPress: () => {
+              stopSpeechRecognition();
+              setIsListening(false);
+            }}]);
+            startVoiceRecognition({
+              language: 'en-US',
+              continuous: false,
+              interimResults: false,
+              onResult: (result) => {
+                processVoiceInput(result.transcript);
+              },
+              onError: (error) => {
+                Alert.alert('Voice Error', error);
+                setIsListening(false);
+              },
+              onEnd: () => {
+                setIsListening(false);
+              }
+            }).catch((error) => {
+              Alert.alert('Voice Error', error.message);
+              setIsListening(false);
+            });
+          }
+        },
       ]
     );
   };
 
-  const startVoiceRecognition = async () => {
-    try {
-      setIsListening(true);
-      
-      Alert.prompt(
-        'Voice Input Simulation',
-        'Enter your task (we\'ll parse it as if it were spoken):',
-        [
-          {
-            text: 'Cancel',
-            style: 'cancel',
-            onPress: () => {
-              setIsListening(false);
-              setVoiceModalVisible(false);
-            },
-          },
-          {
-            text: 'Parse',
-            onPress: (text?: string) => {
-              if (text) {
-                processVoiceInput(text);
-              }
-              setIsListening(false);
-            },
-          },
-        ],
-        'plain-text'
-      );
-    } catch (error) {
-      console.error('Voice recognition error:', error);
-      Alert.alert('Error', 'Failed to start voice recognition');
-      setIsListening(false);
-      setVoiceModalVisible(false);
-    }
-  };
-
   const processVoiceInput = (transcript: string) => {
-    setVoiceTranscript(transcript);
     const parsed = parseVoiceInput(transcript);
     
     if (parsed) {
@@ -104,14 +110,14 @@ export default function CreateTaskScreen() {
       Alert.alert(
         'Task Parsed Successfully',
         `Title: ${parsed.title}\nDate: ${formatDate(parsed.date)}${parsed.time ? `\nTime: ${formatTime(parsed.time)}` : ''}`,
-        [{ text: 'OK', onPress: () => setVoiceModalVisible(false) }]
+        [{ text: 'OK' }]
       );
     } else {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       Alert.alert(
         'Parsing Failed',
         'Could not understand the task. Please try again or enter manually.',
-        [{ text: 'OK', onPress: () => setVoiceModalVisible(false) }]
+        [{ text: 'OK' }]
       );
     }
   };
@@ -146,19 +152,46 @@ export default function CreateTaskScreen() {
         return;
       }
 
-      const task = await createTask(taskData);
+      // Create task with timeout
+      const task = await Promise.race([
+        createTask(taskData),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Task creation timeout')), 10000)
+        )
+      ]) as Task;
 
       const settings = await getSettings();
       
       if (settings.notificationsEnabled) {
-        await scheduleTaskReminders(task, settings.ttsEnabled);
+        try {
+          await scheduleTaskReminders(task, settings.ttsEnabled);
+        } catch (error) {
+          console.error('Failed to schedule reminders:', error);
+          // Don't fail task creation if reminders fail
+        }
       }
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      router.back();
+      Alert.alert(
+        'Success',
+        'Task created successfully!',
+        [
+          { 
+            text: 'OK', 
+            onPress: () => {
+              // Force navigation back and refresh
+              router.replace('/');
+            }
+          }
+        ]
+      );
     } catch (error) {
       console.error('Error creating task:', error);
-      Alert.alert('Error', 'Failed to create task. Please try again.');
+      Alert.alert(
+        'Error',
+        'Failed to create task. Please try again.',
+        [{ text: 'OK' }]
+      );
     } finally {
       setLoading(false);
     }
@@ -179,70 +212,53 @@ export default function CreateTaskScreen() {
             />
           </View>
 
-          <TouchableOpacity style={styles.voiceButton} onPress={handleVoiceInput}>
-            <Text style={styles.voiceIcon}>🎤</Text>
-            <Text style={styles.voiceButtonText}>Use Voice Input</Text>
+          <TouchableOpacity 
+            style={[styles.voiceButton, isListening && styles.voiceButtonActive]} 
+            onPress={handleVoiceInput}
+            disabled={loading}
+          >
+            {isListening ? (
+              <ActivityIndicator size="small" color={COLORS.text} />
+            ) : (
+              <Text style={styles.voiceIcon}>🎤</Text>
+            )}
+            <Text style={styles.voiceButtonText}>
+              {isListening ? 'Listening...' : 'Use Voice Input'}
+            </Text>
           </TouchableOpacity>
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Date *</Text>
-            <TouchableOpacity
-              style={styles.dateButton}
-              onPress={() => setShowDatePicker(true)}
-            >
-              <Text style={styles.dateButtonText}>📅 {formatDate(date)}</Text>
-            </TouchableOpacity>
-          </View>
-
-          {showDatePicker && (
-            <DateTimePicker
+            <DateTimePickerComponent
               value={date}
               mode="date"
-              display="default"
-              onChange={(event, selectedDate) => {
-                setShowDatePicker(Platform.OS === 'ios');
-                if (selectedDate) {
-                  setDate(selectedDate);
-                }
-              }}
+              onChange={setDate}
+              showPicker={showDatePicker}
+              onPickerToggle={() => setShowDatePicker(!showDatePicker)}
             />
-          )}
+          </View>
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Time (Optional)</Text>
             <View style={styles.timeContainer}>
-              <TouchableOpacity
-                style={styles.dateButton}
-                onPress={() => setShowTimePicker(true)}
-              >
-                <Text style={styles.dateButtonText}>
-                  🕐 {time ? formatTime(`${time.getHours()}:${time.getMinutes()}`) : 'No time set'}
-                </Text>
-              </TouchableOpacity>
+              <DateTimePickerComponent
+                value={time || new Date()}
+                mode="time"
+                onChange={(newTime) => setTime(newTime)}
+                showPicker={showTimePicker}
+                onPickerToggle={() => setShowTimePicker(!showTimePicker)}
+              />
               {time && (
                 <TouchableOpacity
                   style={styles.clearButton}
                   onPress={() => setTime(undefined)}
+                  disabled={loading}
                 >
                   <Text style={styles.clearButtonText}>Clear</Text>
                 </TouchableOpacity>
               )}
             </View>
           </View>
-
-          {showTimePicker && (
-            <DateTimePicker
-              value={time || new Date()}
-              mode="time"
-              display="default"
-              onChange={(event, selectedTime) => {
-                setShowTimePicker(Platform.OS === 'ios');
-                if (selectedTime) {
-                  setTime(selectedTime);
-                }
-              }}
-            />
-          )}
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Priority</Text>
@@ -346,6 +362,9 @@ const styles = StyleSheet.create({
     padding: SPACING.md,
     marginBottom: SPACING.lg,
   },
+  voiceButtonActive: {
+    backgroundColor: COLORS.error,
+  },
   voiceIcon: {
     fontSize: 24,
     marginRight: SPACING.sm,
@@ -353,17 +372,6 @@ const styles = StyleSheet.create({
   voiceButtonText: {
     fontSize: FONT_SIZES.md,
     fontWeight: '600',
-    color: COLORS.text,
-  },
-  dateButton: {
-    backgroundColor: COLORS.surface,
-    borderRadius: BORDER_RADIUS.md,
-    padding: SPACING.md,
-    borderWidth: 1,
-    borderColor: COLORS.divider,
-  },
-  dateButtonText: {
-    fontSize: FONT_SIZES.md,
     color: COLORS.text,
   },
   timeContainer: {
