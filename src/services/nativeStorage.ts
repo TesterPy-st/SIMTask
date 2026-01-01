@@ -1,6 +1,6 @@
 /**
  * Native storage implementation using SQLite
- * Wrapper around expo-sqlite for iOS and Android
+ * Wrapper around expo-sqlite for Android
  */
 
 import * as SQLite from 'expo-sqlite';
