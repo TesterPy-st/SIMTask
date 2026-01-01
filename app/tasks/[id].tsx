@@ -119,6 +119,12 @@ export default function TaskDetailScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setIsEditing(false);
       await loadTask();
+
+      Alert.alert(
+        'Task Updated Successfully',
+        'Your task has been updated and reminders have been rescheduled.',
+        [{ text: 'OK' }]
+      );
     } catch (error) {
       console.error('Error updating task:', error);
       Alert.alert('Error', 'Failed to update task. Please try again.');

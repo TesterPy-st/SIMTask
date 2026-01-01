@@ -3,7 +3,7 @@
     "name": "SIMTask",
     "slug": "simtask",
     "version": "1.0.0",
-    "platforms": ["ios", "android", "web"],
+    "platforms": ["android"],
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -13,14 +13,6 @@
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#0A1929"
-    },
-    "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.simtask.app",
-      "infoPlist": {
-        "NSMicrophoneUsageDescription": "This app needs microphone access to enable voice task creation.",
-        "NSSpeechRecognitionUsageDescription": "This app uses speech recognition to create tasks from voice input."
-      }
     },
     "android": {
       "adaptiveIcon": {
@@ -33,10 +25,6 @@
         "SCHEDULE_EXACT_ALARM",
         "RECORD_AUDIO"
       ]
-    },
-    "web": {
-      "bundler": "metro",
-      "favicon": "./assets/favicon.png"
     },
     "plugins": [
       [
