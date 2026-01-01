@@ -31,7 +31,6 @@
   },
   "private": true,
   "devDependencies": {
-    "@expo/webpack-config": "^19.0.1",
     "@types/react": "~19.1.10",
     "@types/react-native": "^0.72.8",
     "babel-preset-expo": "^54.0.9",
