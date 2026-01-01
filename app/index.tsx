@@ -11,7 +11,7 @@ import {
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Calendar } from 'react-native-calendars';
-import { getAllTasks, getTasksByDate } from '../src/services/database';
+import { getAllTasks, getTasksByDate } from '../src/services/storage';
 import { Task } from '../src/types';
 import { TaskCard } from '../src/components/TaskCard';
 import { Footer } from '../src/components/Footer';

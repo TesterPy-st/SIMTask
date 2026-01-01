@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { getSettings, updateSettings, clearAllData } from '../../src/services/database';
+import { getSettings, updateSettings, clearAllData } from '../../src/services/storage';
 import { Settings } from '../../src/types';
 import { Footer } from '../../src/components/Footer';
 import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS } from '../../src/constants/theme';

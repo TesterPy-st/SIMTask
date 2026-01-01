@@ -18,9 +18,10 @@ import {
   updateTask,
   deleteTask,
   getSettings,
-} from '../../src/services/database';
-import { scheduleTaskReminders, cancelTaskReminders } from '../../src/services/notifications';
+} from '../../src/services/storage';
+import { scheduleTaskReminders, cancelTaskReminders } from '../../src/services/platformNotifications';
 import { Task } from '../../src/types';
+import { validateTask, sanitizeText } from '../../src/utils/validation';
 import { Button } from '../../src/components/Button';
 import { Footer } from '../../src/components/Footer';
 import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS } from '../../src/constants/theme';
@@ -87,13 +88,23 @@ export default function TaskDetailScreen() {
         ? `${time.getHours().toString().padStart(2, '0')}:${time.getMinutes().toString().padStart(2, '0')}`
         : undefined;
 
-      await updateTask(id, {
-        title: title.trim(),
+      // Validate and sanitize inputs
+      const taskData = {
+        title: sanitizeText(title.trim()),
         date: taskDate,
         time: taskTime,
-        description: description.trim() || undefined,
+        description: description.trim() ? sanitizeText(description.trim()) : undefined,
         priority,
-      });
+      };
+
+      const validation = validateTask(taskData);
+      if (!validation.valid) {
+        Alert.alert('Validation Error', validation.errors.join('\n'));
+        setLoading(false);
+        return;
+      }
+
+      await updateTask(id, taskData);
 
       const settings = await getSettings();
       
