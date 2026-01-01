@@ -20,7 +20,6 @@ export const requestNotificationPermissions = async (): Promise<boolean> => {
   if (isWeb()) {
     // Web Notifications API
     if (typeof window === 'undefined' || !('Notification' in window)) {
-      console.log('This browser does not support notifications');
       return false;
     }
 
@@ -42,7 +41,6 @@ export const requestNotificationPermissions = async (): Promise<boolean> => {
     const Device = await import('expo-device');
 
     if (!Device.default.isDevice) {
-      console.log('Must use physical device for notifications');
       return false;
     }
 
@@ -55,7 +53,6 @@ export const requestNotificationPermissions = async (): Promise<boolean> => {
     }
 
     if (finalStatus !== 'granted') {
-      console.log('Failed to get notification permissions');
       return false;
     }
 
@@ -240,7 +237,7 @@ export const cancelTaskReminders = async (taskId: string): Promise<void> => {
 export const setupNotificationListener = async (ttsEnabled: boolean): Promise<void> => {
   if (isWeb()) {
     // Web notifications are handled in scheduleTaskReminders
-    console.log('Web notification listener setup (handled inline)');
+    return;
   } else {
     // Setup native notification listener
     const Notifications = await import('expo-notifications');

@@ -8,7 +8,7 @@ import {
   Animated,
   RefreshControl,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Calendar } from 'react-native-calendars';
 import { getAllTasks, getTasksByDate } from '../src/services/storage';
@@ -63,6 +63,15 @@ export default function HomeScreen() {
       return () => clearInterval(timeInterval);
     }
   }, [showSplash]);
+
+  // Refresh tasks when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      if (!showSplash) {
+        loadTasks();
+      }
+    }, [showSplash])
+  );
 
   const loadTasks = async () => {
     try {
