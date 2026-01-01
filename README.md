@@ -4,6 +4,25 @@ A production-ready, cross-platform task management application with intelligent 
 
 **Developed by:** Mr. Sima & Mr. Siba
 
+## Cross-Platform Support
+
+SIMTask works seamlessly across all platforms with automatic platform detection:
+
+- ✅ **iOS** - Native experience with SQLite, expo-notifications, and expo-speech
+- ✅ **Android** - Full feature support with native APIs and permissions
+- ✅ **Web** - Browser-based version using IndexedDB, Web Notifications API, and Web Speech API
+
+### Platform-Specific Features
+
+| Feature | iOS/Android | Web |
+|---------|------------|-----|
+| Task Storage | SQLite | IndexedDB |
+| Notifications | expo-notifications | Web Notifications API |
+| Text-to-Speech | expo-speech | Web Speech API |
+| Voice Input | Native speech recognition | Web Speech API |
+| Offline Support | ✅ Full | ✅ Full |
+| Haptic Feedback | ✅ | ⚠️ Limited |
+
 ## Features
 
 ### Core Functionality
@@ -28,14 +47,22 @@ A production-ready, cross-platform task management application with intelligent 
 
 ## Technology Stack
 
-- **Framework**: React Native with Expo
-- **Navigation**: Expo Router (file-based routing)
-- **Database**: Expo SQLite (offline-first local storage)
-- **Notifications**: Expo Notifications with scheduling
-- **Speech**: Expo Speech for TTS
-- **UI Components**: React Native core components with custom styling
-- **Calendar**: React Native Calendars
-- **Date/Time Pickers**: React Native Community DateTimePicker
+- **Framework**: React Native 0.81 with Expo 54
+- **Navigation**: Expo Router 6 (file-based routing)
+- **Storage**:
+  - **Native (iOS/Android)**: Expo SQLite 16
+  - **Web**: IndexedDB with custom wrapper
+  - **Unified API**: Platform-aware storage interface
+- **Notifications**:
+  - **Native**: Expo Notifications 0.32
+  - **Web**: Web Notifications API
+- **Speech**:
+  - **Native**: Expo Speech 14
+  - **Web**: Web Speech API
+- **UI Components**: React Native core + react-native-web
+- **Calendar**: React Native Calendars 1.13
+- **Date/Time Pickers**: React Native Community DateTimePicker 8.5
+- **TypeScript**: Full type safety with TypeScript 5.9
 
 ## Project Structure
 
@@ -55,14 +82,19 @@ simtask/
 │   │   ├── Footer.tsx
 │   │   └── TaskCard.tsx
 │   ├── services/                # Business logic services
-│   │   ├── database.ts          # SQLite operations
-│   │   ├── notifications.ts     # Notification scheduling
-│   │   └── tts.ts              # Text-to-speech
+│   │   ├── storage.ts           # Unified storage interface
+│   │   ├── webStorage.ts        # IndexedDB for web
+│   │   ├── nativeStorage.ts     # SQLite for native
+│   │   ├── platformNotifications.ts  # Cross-platform notifications
+│   │   └── textToSpeech.ts      # Cross-platform TTS
 │   ├── utils/                   # Utility functions
+│   │   ├── platformDetection.ts # Platform detection utilities
+│   │   ├── validation.ts        # Input validation & sanitization
 │   │   ├── dateUtils.ts
 │   │   └── voiceParser.ts       # Natural language parsing
 │   ├── types/                   # TypeScript definitions
-│   │   └── index.ts
+│   │   ├── index.ts
+│   │   └── global.d.ts
 │   └── constants/               # App constants and theme
 │       ├── theme.ts
 │       └── config.ts
@@ -136,6 +168,29 @@ expo build:ios
 - **Enable/Disable Notifications**: Toggle reminder notifications
 - **Voice Notifications**: Enable/disable audio TTS for reminders
 - **Clear All Tasks**: Delete all tasks (with confirmation)
+
+## Security & Data Validation
+
+SIMTask implements comprehensive security measures:
+
+### Input Validation
+- **Title**: Required, max 255 characters, sanitized against XSS
+- **Description**: Optional, max 2000 characters, HTML tags stripped
+- **Date**: Strict ISO 8601 format validation (YYYY-MM-DD)
+- **Time**: 24-hour format validation (HH:mm)
+- **Priority**: Enum validation (low, medium, high)
+
+### Data Security
+- **Local Storage**: All data stored securely on device (SQLite/IndexedDB)
+- **No External APIs**: Zero external data transmission
+- **Input Sanitization**: All user input sanitized before storage
+- **XSS Protection**: HTML tags and scripts stripped from inputs
+- **Type Safety**: Full TypeScript type checking
+
+### Permissions
+- **Notifications**: Requested on app launch, optional
+- **Microphone** (for voice input): Requested when accessing voice feature
+- **Storage**: Automatic for local data persistence
 
 ## Notification System
 

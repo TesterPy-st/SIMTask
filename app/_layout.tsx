@@ -3,8 +3,8 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { View, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { initDatabase, getSettings } from '../src/services/database';
-import { requestNotificationPermissions, setupNotificationListener } from '../src/services/notifications';
+import { initDatabase, getSettings } from '../src/services/storage';
+import { requestNotificationPermissions, setupNotificationListener } from '../src/services/platformNotifications';
 import { COLORS } from '../src/constants/theme';
 
 export default function RootLayout() {

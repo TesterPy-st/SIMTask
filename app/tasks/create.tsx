@@ -14,9 +14,10 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Haptics from 'expo-haptics';
-import { createTask, getSettings } from '../../src/services/database';
-import { scheduleTaskReminders } from '../../src/services/notifications';
+import { createTask, getSettings } from '../../src/services/storage';
+import { scheduleTaskReminders } from '../../src/services/platformNotifications';
 import { parseVoiceInput } from '../../src/utils/voiceParser';
+import { validateTask, sanitizeText } from '../../src/utils/validation';
 import { Button } from '../../src/components/Button';
 import { Footer } from '../../src/components/Footer';
 import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS } from '../../src/constants/theme';
@@ -66,7 +67,7 @@ export default function CreateTaskScreen() {
           },
           {
             text: 'Parse',
-            onPress: (text) => {
+            onPress: (text?: string) => {
               if (text) {
                 processVoiceInput(text);
               }
@@ -129,13 +130,23 @@ export default function CreateTaskScreen() {
         ? `${time.getHours().toString().padStart(2, '0')}:${time.getMinutes().toString().padStart(2, '0')}`
         : undefined;
 
-      const task = await createTask({
-        title: title.trim(),
+      // Validate and sanitize inputs
+      const taskData = {
+        title: sanitizeText(title.trim()),
         date: taskDate,
         time: taskTime,
-        description: description.trim() || undefined,
+        description: description.trim() ? sanitizeText(description.trim()) : undefined,
         priority,
-      });
+      };
+
+      const validation = validateTask(taskData);
+      if (!validation.valid) {
+        Alert.alert('Validation Error', validation.errors.join('\n'));
+        setLoading(false);
+        return;
+      }
+
+      const task = await createTask(taskData);
 
       const settings = await getSettings();
       
