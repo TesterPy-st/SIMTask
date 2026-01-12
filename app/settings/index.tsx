@@ -136,10 +136,9 @@ export default function SettingsScreen() {
                 <Text style={styles.featureTitle}>Features:</Text>
                 <Text style={styles.featureItem}>✓ Calendar view with task indicators</Text>
                 <Text style={styles.featureItem}>✓ Smart reminder system</Text>
-                <Text style={styles.featureItem}>✓ Voice task creation</Text>
                 <Text style={styles.featureItem}>✓ Text-to-speech notifications</Text>
                 <Text style={styles.featureItem}>✓ Offline-first architecture</Text>
-                <Text style={styles.featureItem}>✓ Cross-platform support</Text>
+                <Text style={styles.featureItem}>✓ Local SQLite database</Text>
               </View>
             </View>
           </View>

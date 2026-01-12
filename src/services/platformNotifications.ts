@@ -1,72 +1,45 @@
 /**
- * Platform-aware notifications service
- * Native: expo-notifications
- * Web: Web Notifications API
+ * Notifications service for Android
+ * Uses expo-notifications
  */
 
+import * as Notifications from 'expo-notifications';
+import * as Device from 'expo-device';
 import { Platform } from 'react-native';
-import { isWeb } from '../utils/platformDetection';
 import { Task } from '../types';
 import { NOTIFICATION_CONFIG } from '../constants/config';
 import { playTaskReminder } from './textToSpeech';
-
-// Web notification storage
-const webNotifications = new Map<string, number[]>();
 
 /**
  * Request notification permissions
  */
 export const requestNotificationPermissions = async (): Promise<boolean> => {
-  if (isWeb()) {
-    // Web Notifications API
-    if (typeof window === 'undefined' || !('Notification' in window)) {
-      return false;
-    }
-
-    const NotificationAPI = (window as any).Notification;
-
-    if (NotificationAPI.permission === 'granted') {
-      return true;
-    }
-
-    if (NotificationAPI.permission !== 'denied') {
-      const permission = await NotificationAPI.requestPermission();
-      return permission === 'granted';
-    }
-
+  if (!Device.isDevice) {
     return false;
-  } else {
-    // Native notifications
-    const Notifications = await import('expo-notifications');
-    const Device = await import('expo-device');
-
-    if (!Device.default.isDevice) {
-      return false;
-    }
-
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
-    let finalStatus = existingStatus;
-
-    if (existingStatus !== 'granted') {
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
-    }
-
-    if (finalStatus !== 'granted') {
-      return false;
-    }
-
-    if (Platform.OS === 'android') {
-      await Notifications.setNotificationChannelAsync('default', {
-        name: 'Task Reminders',
-        importance: Notifications.AndroidImportance.MAX,
-        vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#0A84FF',
-      });
-    }
-
-    return true;
   }
+
+  const { status: existingStatus } = await Notifications.getPermissionsAsync();
+  let finalStatus = existingStatus;
+
+  if (existingStatus !== 'granted') {
+    const { status } = await Notifications.requestPermissionsAsync();
+    finalStatus = status;
+  }
+
+  if (finalStatus !== 'granted') {
+    return false;
+  }
+
+  if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync('default', {
+      name: 'Task Reminders',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#0A84FF',
+    });
+  }
+
+  return true;
 };
 
 /**
@@ -139,68 +112,25 @@ export const scheduleTaskReminders = async (task: Task, ttsEnabled: boolean = tr
   const reminderDates = calculateReminderDate(task.date, task.time);
   const notificationIds: string[] = [];
 
-  if (isWeb()) {
-    // Schedule web notifications using setTimeout
-    const timeouts: number[] = [];
-    
-    for (const reminderDate of reminderDates) {
-      const delay = reminderDate.getTime() - Date.now();
-      
-      if (delay > 0 && typeof window !== 'undefined') {
-        const timeoutId = window.setTimeout(() => {
-          const isTaskDay = reminderDate.toDateString() === new Date(task.date).toDateString();
-          const title = isTaskDay ? '📅 Task Due Today!' : '⏰ Upcoming Task';
-          const body = `${task.title}\nScheduled: ${formatTaskDateTime(task.date, task.time)}`;
-          
-          const NotificationAPI = (window as any).Notification;
-          if (NotificationAPI && NotificationAPI.permission === 'granted') {
-            new NotificationAPI(title, {
-              body,
-              icon: '/favicon.png',
-              tag: task.id,
-            });
-          }
-          
-          // Play TTS if enabled
-          if (ttsEnabled) {
-            const message = task.time
-              ? `${task.title} scheduled for ${formatTaskDateTime(task.date, task.time)}`
-              : `${task.title} scheduled for ${formatTaskDateTime(task.date)}`;
-            playTaskReminder(message);
-          }
-        }, delay);
-        
-        timeouts.push(timeoutId);
-        notificationIds.push(`web_${task.id}_${timeoutId}`);
-      }
-    }
-    
-    // Store timeouts for cancellation
-    webNotifications.set(task.id, timeouts);
-  } else {
-    // Use expo-notifications for native
-    const Notifications = await import('expo-notifications');
-    
-    for (const reminderDate of reminderDates) {
-      try {
-        const isTaskDay = reminderDate.toDateString() === new Date(task.date).toDateString();
-        const notificationId = await Notifications.scheduleNotificationAsync({
-          content: {
-            title: isTaskDay ? '📅 Task Due Today!' : '⏰ Upcoming Task',
-            body: `${task.title}\nScheduled: ${formatTaskDateTime(task.date, task.time)}`,
-            data: { taskId: task.id, taskTitle: task.title, taskDate: task.date, taskTime: task.time },
-            sound: true,
-          },
-          trigger: { 
-            type: Notifications.SchedulableTriggerInputTypes.DATE,
-            date: reminderDate 
-          },
-        });
+  for (const reminderDate of reminderDates) {
+    try {
+      const isTaskDay = reminderDate.toDateString() === new Date(task.date).toDateString();
+      const notificationId = await Notifications.scheduleNotificationAsync({
+        content: {
+          title: isTaskDay ? '📅 Task Due Today!' : '⏰ Upcoming Task',
+          body: `${task.title}\nScheduled: ${formatTaskDateTime(task.date, task.time)}`,
+          data: { taskId: task.id, taskTitle: task.title, taskDate: task.date, taskTime: task.time },
+          sound: true,
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+          date: reminderDate
+        },
+      });
 
-        notificationIds.push(notificationId);
-      } catch (error) {
-        console.error('Error scheduling notification:', error);
-      }
+      notificationIds.push(notificationId);
+    } catch (error) {
+      console.error('Error scheduling notification:', error);
     }
   }
 
@@ -211,22 +141,11 @@ export const scheduleTaskReminders = async (task: Task, ttsEnabled: boolean = tr
  * Cancel task reminders
  */
 export const cancelTaskReminders = async (taskId: string): Promise<void> => {
-  if (isWeb()) {
-    // Cancel web notifications
-    const timeouts = webNotifications.get(taskId);
-    if (timeouts && typeof window !== 'undefined') {
-      timeouts.forEach(timeoutId => window.clearTimeout(timeoutId));
-      webNotifications.delete(taskId);
-    }
-  } else {
-    // Cancel native notifications
-    const Notifications = await import('expo-notifications');
-    const notifications = await Notifications.getAllScheduledNotificationsAsync();
-    
-    for (const notification of notifications) {
-      if (notification.content.data?.taskId === taskId) {
-        await Notifications.cancelScheduledNotificationAsync(notification.identifier);
-      }
+  const notifications = await Notifications.getAllScheduledNotificationsAsync();
+
+  for (const notification of notifications) {
+    if (notification.content.data?.taskId === taskId) {
+      await Notifications.cancelScheduledNotificationAsync(notification.identifier);
     }
   }
 };
@@ -235,34 +154,26 @@ export const cancelTaskReminders = async (taskId: string): Promise<void> => {
  * Setup notification listener
  */
 export const setupNotificationListener = async (ttsEnabled: boolean): Promise<void> => {
-  if (isWeb()) {
-    // Web notifications are handled in scheduleTaskReminders
-    return;
-  } else {
-    // Setup native notification listener
-    const Notifications = await import('expo-notifications');
-    
-    Notifications.setNotificationHandler({
-      handleNotification: async () => ({
-        shouldShowAlert: true,
-        shouldPlaySound: true,
-        shouldSetBadge: false,
-        shouldShowBanner: true,
-        shouldShowList: true,
-      }),
-    });
-    
-    Notifications.addNotificationReceivedListener(async (notification) => {
-      const data = notification.request.content.data as any || {};
-      const { taskTitle, taskDate, taskTime } = data;
-      
-      if (ttsEnabled && taskTitle) {
-        const message = taskTime
-          ? `${String(taskTitle)} scheduled for ${formatTaskDateTime(String(taskDate), String(taskTime))}`
-          : `${String(taskTitle)} scheduled for ${formatTaskDateTime(String(taskDate))}`;
-        
-        await playTaskReminder(message);
-      }
-    });
-  }
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+
+  Notifications.addNotificationReceivedListener(async (notification) => {
+    const data = notification.request.content.data as any || {};
+    const { taskTitle, taskDate, taskTime } = data;
+
+    if (ttsEnabled && taskTitle) {
+      const message = taskTime
+        ? `${String(taskTitle)} scheduled for ${formatTaskDateTime(String(taskDate), String(taskTime))}`
+        : `${String(taskTitle)} scheduled for ${formatTaskDateTime(String(taskDate))}`;
+
+      await playTaskReminder(message);
+    }
+  });
 };

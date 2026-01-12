@@ -8,8 +8,7 @@
     "allowSyntheticDefaultImports": true,
     "jsx": "react-native",
     "lib": [
-      "esnext",
-      "dom"
+      "esnext"
     ],
     "target": "esnext",
     "module": "esnext",
